@@ -137,7 +137,10 @@ def summarize(
         no_content = {"zh": "暂无新内容。", "en": "No new content.", "bilingual": "暂无新内容。/ No new content."}
         return no_content.get(language, "暂无新内容。")
 
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
     digest = prepare_digest(items)
+    digest["brief_date"] = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
     content = json.dumps(digest, ensure_ascii=False, indent=2)
 
     system_prompt = Path("interest-prompt.txt").read_text(encoding="utf-8") if language == "zh" else _PROMPTS.get(language, _PROMPTS["zh"])
