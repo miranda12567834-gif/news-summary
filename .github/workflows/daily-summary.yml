@@ -44,12 +44,16 @@ jobs:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           DEEPSEEK_MODEL: ${{ vars.DEEPSEEK_MODEL || 'deepseek-flash' }}
           OUTPUT_MODE: markdown
-        run: python -m src.runner --preview
+        run: |
+          python -m src.runner --preview
+          mkdir -p digest-preview
+          cp "summaries/$(date +%F).md" digest-preview/
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'workflow_dispatch' && inputs.mode == 'preview'
         with:
           name: digest-preview
-          path: summaries/*.md
+          path: digest-preview/*.md
+          if-no-files-found: error
           retention-days: 3
       - name: Generate and send
         if: (github.event_name == 'schedule' || inputs.mode == 'send') && vars.QUALITY_APPROVED == 'true'
