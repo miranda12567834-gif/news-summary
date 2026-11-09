@@ -7,6 +7,14 @@ sources:
   - {type: rss, name: 女性与社会, url: 'https://www.theguardian.com/lifeandstyle/women/rss', fetch_fulltext: true, fulltext_chars: 8000}
   - {type: rss, name: 文化影视, url: 'https://www.theguardian.com/culture/rss', fetch_fulltext: true, fulltext_chars: 8000}
   - {type: rss, name: 科技互联网, url: 'https://www.theguardian.com/technology/rss', fetch_fulltext: true, fulltext_chars: 8000}
-  - {type: rss, name: 科学研究, url: 'https://www.nature.com/nature.rss', fetch_fulltext: true, fulltext_chars: 8000}
+  - {type: rss, name: Nature新闻与研究, url: 'https://www.nature.com/nature.rss', fetch_fulltext: true, fulltext_chars: 8000}
   - {type: rss, name: 中国与社会, url: 'https://www.theguardian.com/world/china/rss', fetch_fulltext: true, fulltext_chars: 8000}
   - {type: rss, name: 中文数字生活, url: 'https://sspai.com/feed', fetch_fulltext: true, fulltext_chars: 8000}
+  - {type: rss, name: 'UN Women女性与性别', url: 'https://www.unwomen.org/en/rss.xml', fetch_fulltext: true, fulltext_chars: 16000}
+  - {type: rss, name: 'OpenAI官方', url: 'https://openai.com/news/rss.xml', fetch_fulltext: true, fulltext_chars: 16000}
+  - {type: rss, name: '英国政府政策公告', url: 'https://www.gov.uk/search/news-and-communications.atom', fetch_fulltext: true, fulltext_chars: 16000}
+  - {type: rss, name: 'Communications Psychology心理学论文', url: 'https://www.nature.com/commspsychol.rss', fetch_fulltext: true, fulltext_chars: 16000}
+  - {type: rss, name: 'Nature Human Behaviour人类行为论文', url: 'https://www.nature.com/nathumbehav.rss', fetch_fulltext: true, fulltext_chars: 16000}
+  - {type: rss, name: 'Nature Sustainability可持续发展论文', url: 'https://www.nature.com/natsustain.rss', fetch_fulltext: true, fulltext_chars: 16000}
+  - {type: rss, name: 'Nature Medicine医学论文', url: 'https://www.nature.com/nm.rss', fetch_fulltext: true, fulltext_chars: 16000}
+  - {type: rss, name: 'Scientific Reports跨领域论文', url: 'https://www.nature.com/srep.rss', fetch_fulltext: true, fulltext_chars: 16000}
