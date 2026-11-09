@@ -85,13 +85,16 @@ def fetch_rss(
             summary = re.sub(r"<[^>]+>", " ", summary)
             summary = " ".join(summary.split())
 
-        # 只有当 RSS 里没有充足内容时才用 trafilatura 抓全文
-        # （Substack content:encoded 通常已足够，不需要再爬页面）
-        content = summary if len(summary) >= 200 else None
-        if fetch_fulltext and link and not content:
+        # Read the article even when the feed contains a descriptive snippet.
+        content = summary
+        if fetch_fulltext and link:
             content = _fetch_fulltext(link, max_chars=fulltext_chars)
-            if not content:
-                content = summary  # trafilatura 失败则保留 RSS 摘要
+            if not content or len(content) < 600:
+                new_items.append(RawItem(
+                    source_name=source_name, source_type="rss",
+                    title="[正文不足]", content="原文提取失败或不足600字符，未用于生成。", link=link))
+                continue
+            content = "[网页正文提取；可能截断，非独立事实核验]\n" + content
 
         if content and len(content) > fulltext_chars:
             content = content[:fulltext_chars] + "…（正文已截断）"

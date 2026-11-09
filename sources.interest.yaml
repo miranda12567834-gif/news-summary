@@ -1,11 +1,12 @@
 language: zh
 max_entries: 2
-max_age_days: 3
+max_age_days: 7
 sources:
-  - {type: rss, name: BBC国际, url: 'https://feeds.bbci.co.uk/news/world/rss.xml', fetch_fulltext: true, fulltext_chars: 3000}
-  - {type: rss, name: 联合国新闻, url: 'https://news.un.org/feed/subscribe/en/news/all/rss.xml', fetch_fulltext: true, fulltext_chars: 3000}
-  - {type: rss, name: 女性与社会, url: 'https://www.theguardian.com/lifeandstyle/women/rss', fetch_fulltext: true, fulltext_chars: 3000}
-  - {type: rss, name: 文化影视, url: 'https://www.theguardian.com/culture/rss', fetch_fulltext: true, fulltext_chars: 3000}
-  - {type: rss, name: 科技互联网, url: 'https://www.theguardian.com/technology/rss', fetch_fulltext: true, fulltext_chars: 3000}
-  - {type: rss, name: 科学研究, url: 'https://www.nature.com/nature.rss', fetch_fulltext: true, fulltext_chars: 3000}
-  - {type: rss, name: 中国与社会, url: 'https://www.theguardian.com/world/china/rss', fetch_fulltext: true, fulltext_chars: 3000}
+  - {type: rss, name: BBC国际, url: 'https://feeds.bbci.co.uk/news/world/rss.xml', fetch_fulltext: true, fulltext_chars: 8000}
+  - {type: rss, name: 联合国新闻, url: 'https://news.un.org/feed/subscribe/en/news/all/rss.xml', fetch_fulltext: true, fulltext_chars: 8000}
+  - {type: rss, name: 女性与社会, url: 'https://www.theguardian.com/lifeandstyle/women/rss', fetch_fulltext: true, fulltext_chars: 8000}
+  - {type: rss, name: 文化影视, url: 'https://www.theguardian.com/culture/rss', fetch_fulltext: true, fulltext_chars: 8000}
+  - {type: rss, name: 科技互联网, url: 'https://www.theguardian.com/technology/rss', fetch_fulltext: true, fulltext_chars: 8000}
+  - {type: rss, name: 科学研究, url: 'https://www.nature.com/nature.rss', fetch_fulltext: true, fulltext_chars: 8000}
+  - {type: rss, name: 中国与社会, url: 'https://www.theguardian.com/world/china/rss', fetch_fulltext: true, fulltext_chars: 8000}
+  - {type: rss, name: 中文数字生活, url: 'https://sspai.com/feed', fetch_fulltext: true, fulltext_chars: 8000}

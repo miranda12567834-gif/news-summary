@@ -1,8 +1,8 @@
-"""使用 Claude 对抓取的内容进行总结
+"""使用 DeepSeek 对抓取的内容进行总结
 
 架构说明（参考 follow-builders 的设计）：
   - prepare_digest()：纯数据整理，输出结构化 JSON，不调用 LLM
-  - summarize()：将 JSON 送给 Claude 生成可读摘要
+  - summarize()：将 JSON 送给 DeepSeek 生成可读摘要
   两步分离，便于调试和复用。
 """
 
@@ -123,12 +123,12 @@ def prepare_digest(items: list[RawItem]) -> dict:
 def summarize(
     items: list[RawItem],
     api_key: str | None = None,
-    model: str = "moonshot-v1-128k",
+    model: str = "deepseek-flash",
     language: str = "zh",
 ) -> str:
-    """调用 Kimi 生成总结。
+    """调用 DeepSeek 生成总结。
 
-    先通过 prepare_digest() 整理成 JSON，再送给 Kimi，
+    先通过 prepare_digest() 整理成 JSON，再送给 DeepSeek，
     让 LLM 只做「读 JSON → 写文章」一件事，数据与生成解耦。
 
     language: "zh"（中文）| "en"（英文）| "bilingual"（中英双语交错）
@@ -142,10 +142,11 @@ def summarize(
 
     system_prompt = Path("interest-prompt.txt").read_text(encoding="utf-8") if language == "zh" else _PROMPTS.get(language, _PROMPTS["zh"])
 
-    client = OpenAI(api_key=api_key, base_url="https://api.moonshot.cn/v1", max_retries=0, timeout=120)
+    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com", max_retries=0, timeout=120)
     response = client.chat.completions.create(
-        model=os.environ.get("KIMI_MODEL", model),
-        max_tokens=4000,
+        model=os.environ.get("DEEPSEEK_MODEL", model),
+        max_tokens=6000,
+        extra_body={"thinking": {"type": "disabled"}},
         messages=[{"role": "system", "content": system_prompt},
                   {"role": "user", "content": content}],
     )
@@ -154,4 +155,10 @@ def summarize(
     choice = response.choices[0]
     if choice.finish_reason != "stop" or not choice.message.content:
         raise RuntimeError("模型输出不完整，停止投递")
-    return choice.message.content
+    import re
+    result = choice.message.content
+    allowed = {item.link for item in items if item.link}
+    links = re.findall(r"\[[^\]]+\]\((https?://[^)]+)\)", result)
+    if not links or any(link not in allowed for link in links):
+        raise RuntimeError("来源链接缺失或不属于本期材料，停止投递")
+    return result

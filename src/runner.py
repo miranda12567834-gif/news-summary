@@ -129,7 +129,7 @@ def fetch_all(sources: list[dict], global_max_entries: int = 3, global_max_age_d
     return items
 
 
-def _run(config_path: str = "sources.yaml", output_dir: str = "summaries", api_key: str | None = None) -> str:
+def _run(config_path: str = "sources.yaml", output_dir: str = "summaries", api_key: str | None = None, preview: bool = False) -> str:
     """完整流程：抓取 → 总结 → 保存（Notion 或 Markdown）"""
     from datetime import datetime
 
@@ -185,6 +185,9 @@ def _run(config_path: str = "sources.yaml", output_dir: str = "summaries", api_k
                 with open(out_path, "w", encoding="utf-8") as f:
                     f.write(summary_text)
                 results.append(f"Markdown (fallback): {out_path}")
+
+    if preview:
+        return "\n".join(results)
 
     # 推送到 Telegram
     tg_cfg = config.get("telegram", {})
@@ -259,12 +262,25 @@ def check_sources(config_path="sources.yaml"):
             state._STATE_FILE = original
 
 
+
+def preview_digest(config_path="sources.yaml", output_dir="summaries", api_key=None):
+    import tempfile
+    from src import state
+    original = state._STATE_FILE
+    with tempfile.TemporaryDirectory() as folder:
+        state._STATE_FILE = Path(folder) / "state.json"
+        try:
+            return _run(config_path, output_dir, api_key, preview=True)
+        finally:
+            state._STATE_FILE = original
+
+
 if __name__ == "__main__":
     import sys
     if "--check" in sys.argv:
         check_sources()
     else:
-        api_key = os.environ.get("KIMI_API_KEY")
+        api_key = os.environ.get("DEEPSEEK_API_KEY")
         if not api_key:
-            raise ValueError("请设置 KIMI_API_KEY")
-        print(run(api_key=api_key))
+            raise ValueError("请设置 DEEPSEEK_API_KEY")
+        print(preview_digest(api_key=api_key) if "--preview" in sys.argv else run(api_key=api_key))

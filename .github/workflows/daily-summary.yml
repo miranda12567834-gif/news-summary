@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'check免费检查；send调用付费AI并发邮件'
+        description: 'check免费检查；preview付费生成预览；send生成并发邮件'
         type: choice
-        options: [check, send]
+        options: [check, preview, send]
         default: check
 permissions:
   contents: read
@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   summarize:
-    if: github.event_name == 'workflow_dispatch' || vars.DIGEST_ENABLED == 'true'
+    if: github.event_name == 'workflow_dispatch' || (vars.DIGEST_ENABLED == 'true' && vars.QUALITY_APPROVED == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -38,11 +38,24 @@ jobs:
       - name: Check sources without AI or email
         if: github.event_name == 'workflow_dispatch' && inputs.mode == 'check'
         run: python -m src.runner --check
-      - name: Generate and send
-        if: github.event_name == 'schedule' || inputs.mode == 'send'
+      - name: Generate preview without delivery
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'preview'
         env:
-          KIMI_API_KEY: ${{ secrets.KIMI_API_KEY }}
-          KIMI_MODEL: ${{ vars.KIMI_MODEL || 'moonshot-v1-128k' }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          DEEPSEEK_MODEL: ${{ vars.DEEPSEEK_MODEL || 'deepseek-flash' }}
+          OUTPUT_MODE: markdown
+        run: python -m src.runner --preview
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'preview'
+        with:
+          name: digest-preview
+          path: summaries/*.md
+          retention-days: 3
+      - name: Generate and send
+        if: (github.event_name == 'schedule' || inputs.mode == 'send') && vars.QUALITY_APPROVED == 'true'
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          DEEPSEEK_MODEL: ${{ vars.DEEPSEEK_MODEL || 'deepseek-flash' }}
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
@@ -50,7 +63,7 @@ jobs:
           OUTPUT_MODE: markdown
         run: python -m src.runner
       - name: Save state after successful delivery
-        if: success() && (github.event_name == 'schedule' || inputs.mode == 'send')
+        if: success() && vars.QUALITY_APPROVED == 'true' && (github.event_name == 'schedule' || inputs.mode == 'send')
         uses: actions/cache/save@v4
         with:
           path: state.json
