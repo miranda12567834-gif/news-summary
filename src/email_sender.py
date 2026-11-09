@@ -1,6 +1,9 @@
 """通过 Gmail SMTP 发送每日摘要邮件"""
 
 import smtplib
+import os
+import ssl
+import html
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -14,11 +17,11 @@ def send_email(
     language: str = "zh",
 ) -> None:
     title_map = {
-        "zh": f"每日 AI 摘要 {date}",
+        "zh": f"每日兴趣简报 {date}",
         "en": f"Daily AI Summary {date}",
-        "bilingual": f"每日 AI 摘要 / Daily AI Summary {date}",
+        "bilingual": f"每日兴趣简报 / Daily AI Summary {date}",
     }
-    subject = title_map.get(language, f"每日 AI 摘要 {date}")
+    subject = title_map.get(language, f"每日兴趣简报 {date}")
 
     # 支持逗号分隔的多个收件人
     recipients = [addr.strip() for addr in to_address.split(",") if addr.strip()]
@@ -32,7 +35,7 @@ def send_email(
     msg.attach(MIMEText(summary_text, "plain", "utf-8"))
 
     # HTML 版本：把 markdown 粗体/标题简单转换，方便手机阅读
-    html_body = summary_text
+    html_body = html.escape(summary_text)
     import re
     html_body = re.sub(r"^### (.+)$", r"<h3>\1</h3>", html_body, flags=re.MULTILINE)
     html_body = re.sub(r"^## (.+)$", r"<h2>\1</h2>", html_body, flags=re.MULTILINE)
@@ -44,6 +47,8 @@ def send_email(
     html_body = f"<html><body style='font-family:sans-serif;max-width:800px;margin:auto;padding:20px'>{html_body}</body></html>"
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+    with smtplib.SMTP_SSL(os.environ.get("SMTP_HOST", "smtp.qq.com"), 465, timeout=40, context=ssl.create_default_context()) as server:
         server.login(smtp_user, smtp_password)
-        server.sendmail(smtp_user, recipients, msg.as_bytes())
+        refused = server.sendmail(smtp_user, recipients, msg.as_bytes())
+        if refused:
+            raise RuntimeError("部分收件人被服务器拒绝")

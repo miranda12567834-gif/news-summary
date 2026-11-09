@@ -1,6 +1,7 @@
 """RSS 抓取：支持 Substack、博客、YouTube、播客、Twitter(Nitter/OpenRSS)"""
 
 import re
+import calendar
 import time as _time
 import feedparser
 from .base import RawItem
@@ -68,9 +69,11 @@ def fetch_rss(
 
         # 跳过超过 max_age_days 的文章
         published_parsed = entry.get("published_parsed") or entry.get("updated_parsed")
+        if not published_parsed:
+            continue
         if published_parsed:
-            pub_ts = _time.mktime(published_parsed)
-            if pub_ts < age_cutoff:
+            pub_ts = calendar.timegm(published_parsed)
+            if pub_ts < age_cutoff or pub_ts > _time.time():
                 continue
 
         # 用链接去重；无链接的文章不去重
@@ -92,6 +95,9 @@ def fetch_rss(
 
         if content and len(content) > fulltext_chars:
             content = content[:fulltext_chars] + "…（正文已截断）"
+
+        if not link or len(content or "") < 100:
+            continue
 
         if link:
             _state.mark_seen(st, "seenArticles", link)

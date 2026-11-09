@@ -7,8 +7,9 @@
 """
 
 import json
-import time
-from openai import OpenAI, BadRequestError, RateLimitError
+import os
+from pathlib import Path
+from openai import OpenAI
 from src.fetchers.base import RawItem
 
 _PROMPT_BASE = """
@@ -139,79 +140,18 @@ def summarize(
     digest = prepare_digest(items)
     content = json.dumps(digest, ensure_ascii=False, indent=2)
 
-    system_prompt = _PROMPTS.get(language, _PROMPTS["zh"])
+    system_prompt = Path("interest-prompt.txt").read_text(encoding="utf-8") if language == "zh" else _PROMPTS.get(language, _PROMPTS["zh"])
 
-    client = OpenAI(api_key=api_key, base_url="https://api.moonshot.cn/v1")
-
-    def _call_api(payload: str) -> str:
-        for attempt in range(3):
-            try:
-                response = client.chat.completions.create(
-                    model=model,
-                    max_tokens=8192,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": payload},
-                    ],
-                )
-                return response.choices[0].message.content
-            except RateLimitError as e:
-                print(f"[Kimi 429] attempt {attempt + 1}/3: {e}")
-                if attempt < 2:
-                    time.sleep(30 * (attempt + 1))
-                    continue
-                raise
-        raise RuntimeError("unreachable")
-
-    try:
-        return _call_api(content)
-    except RateLimitError as e:
-        print(f"[Kimi fallback] 三次重试后仍 429，返回占位符。原始错误: {e}")
-        fallback = {
-            "zh": "今日摘要生成失败：API 负载过高，请稍后重试。",
-            "en": "Summary generation failed: API engine overloaded. Please try again later.",
-            "bilingual": "今日摘要生成失败：API 负载过高。\nSummary generation failed: API engine overloaded.",
-        }
-        return fallback.get(language, fallback["zh"])
-    except BadRequestError as e:
-        if "content_filter" not in str(e) and "high risk" not in str(e):
-            raise
-        # Full batch blocked — retry source-by-source, skipping blocked ones
-        print("[警告] 全量内容被内容过滤器拦截，尝试按来源逐一重试...")
-        by_source = {}
-        for item in items:
-            by_source.setdefault(item.source_name, []).append(item)
-
-        passed_items: list[RawItem] = []
-        skipped_sources: list[str] = []
-        for source_name, source_items in by_source.items():
-            test_digest = prepare_digest(source_items)
-            test_content = json.dumps(test_digest, ensure_ascii=False, indent=2)
-            try:
-                _call_api(test_content)
-                passed_items.extend(source_items)
-            except BadRequestError as e2:
-                if "content_filter" in str(e2) or "high risk" in str(e2):
-                    print(f"[警告] 跳过被过滤的来源: {source_name}")
-                    skipped_sources.append(source_name)
-                else:
-                    raise
-            except RateLimitError:
-                # If rate limited mid-bisect, include the source optimistically
-                passed_items.extend(source_items)
-
-        if not passed_items:
-            fallback = {
-                "zh": "今日摘要生成失败：所有内容均被 API 内容过滤器拦截。",
-                "en": "Summary generation failed: all content was blocked by the API content filter.",
-                "bilingual": "今日摘要生成失败：所有内容均被 API 内容过滤器拦截。\nSummary generation failed: all content was blocked.",
-            }
-            return fallback.get(language, fallback["zh"])
-
-        clean_digest = prepare_digest(passed_items)
-        clean_content = json.dumps(clean_digest, ensure_ascii=False, indent=2)
-        result = _call_api(clean_content)
-        if skipped_sources:
-            note = "\n\n---\n⚠️ 以下来源因内容过滤被跳过：" + "、".join(skipped_sources)
-            result += note
-        return result
+    client = OpenAI(api_key=api_key, base_url="https://api.moonshot.cn/v1", max_retries=0, timeout=120)
+    response = client.chat.completions.create(
+        model=os.environ.get("KIMI_MODEL", model),
+        max_tokens=4000,
+        messages=[{"role": "system", "content": system_prompt},
+                  {"role": "user", "content": content}],
+    )
+    if response.usage:
+        print("Token usage:", response.usage.model_dump_json())
+    choice = response.choices[0]
+    if choice.finish_reason != "stop" or not choice.message.content:
+        raise RuntimeError("模型输出不完整，停止投递")
+    return choice.message.content

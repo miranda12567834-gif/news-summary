@@ -1,76 +1,57 @@
 name: Daily Summary
-
 on:
   schedule:
-    - cron: "0 1 * * *"  # UTC 01:00 = 北京时间 09:00
-  workflow_dispatch:       # 支持手动触发
-
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'check免费检查；send调用付费AI并发邮件'
+        type: choice
+        options: [check, send]
+        default: check
 permissions:
-  contents: write
-
+  contents: read
+concurrency:
+  group: daily-summary
+  cancel-in-progress: false
 jobs:
   summarize:
+    if: github.event_name == 'workflow_dispatch' || vars.DIGEST_ENABLED == 'true'
     runs-on: ubuntu-latest
-
+    timeout-minutes: 15
+    env:
+      TZ: Asia/Shanghai
+      NEWS_SUMMARY_STATE: ./state.json
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Install Playwright browsers
-        if: ${{ env.TWITTER_COOKIES != '' }}
-        env:
-          TWITTER_COOKIES: ${{ secrets.TWITTER_COOKIES }}
-        run: playwright install chromium
-
-      - name: Restore Twitter cookies
-        if: ${{ env.TWITTER_COOKIES != '' }}
-        env:
-          TWITTER_COOKIES: ${{ secrets.TWITTER_COOKIES }}
-        run: echo "$TWITTER_COOKIES" | base64 -d > twitter_cookies.json
-
-      - name: Restore dedup state cache
-        uses: actions/cache@v4
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - uses: actions/cache/restore@v4
         with:
           path: state.json
-          key: news-summary-state-${{ github.run_id }}
-          restore-keys: news-summary-state
-
-      - name: Create sources.yaml
-        env:
-          SOURCES_YAML: ${{ secrets.SOURCES_YAML }}
-        run: echo "$SOURCES_YAML" | tr -d '\n' | base64 -d > sources.yaml
-
-      - name: Run summary
+          key: news-summary-state-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: news-summary-state-
+      - run: cp sources.interest.yaml sources.yaml
+      - name: Check sources without AI or email
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'check'
+        run: python -m src.runner --check
+      - name: Generate and send
+        if: github.event_name == 'schedule' || inputs.mode == 'send'
         env:
           KIMI_API_KEY: ${{ secrets.KIMI_API_KEY }}
-          SUPADATA_API_KEY: ${{ secrets.SUPADATA_API_KEY }}
-          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
-          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          KIMI_MODEL: ${{ vars.KIMI_MODEL || 'moonshot-v1-128k' }}
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
-          OUTPUT_MODE: both
-          NEWS_SUMMARY_STATE: ./state.json
+          SMTP_HOST: ${{ vars.SMTP_HOST || 'smtp.qq.com' }}
+          OUTPUT_MODE: markdown
         run: python -m src.runner
-
-      - name: Commit summaries
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
-          git add -f summaries/
-          git diff --cached --quiet || git commit -m "chore: daily summary $(date +'%Y-%m-%d')"
-          git pull --rebase origin main
-          git push
+      - name: Save state after successful delivery
+        if: success() && (github.event_name == 'schedule' || inputs.mode == 'send')
+        uses: actions/cache/save@v4
+        with:
+          path: state.json
+          key: news-summary-state-${{ github.run_id }}-${{ github.run_attempt }}

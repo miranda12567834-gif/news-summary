@@ -129,7 +129,7 @@ def fetch_all(sources: list[dict], global_max_entries: int = 3, global_max_age_d
     return items
 
 
-def run(config_path: str = "sources.yaml", output_dir: str = "summaries", api_key: str | None = None) -> str:
+def _run(config_path: str = "sources.yaml", output_dir: str = "summaries", api_key: str | None = None) -> str:
     """完整流程：抓取 → 总结 → 保存（Notion 或 Markdown）"""
     from datetime import datetime
 
@@ -153,10 +153,13 @@ def run(config_path: str = "sources.yaml", output_dir: str = "summaries", api_ke
     # 把"暂无更新"的条目排到末尾，使输出中有内容的来源优先显示
     valid_items.sort(key=lambda i: i.title == "暂无更新")
 
+    if not any(i.link and len(i.content or "") >= 100 for i in valid_items):
+        raise RuntimeError("没有足够的有效材料，停止调用模型")
     summary_text = summarize(valid_items, api_key=api_key, language=language)
 
     output_mode = os.environ.get("OUTPUT_MODE", "markdown")  # notion | markdown | both
-    today = datetime.now().strftime("%Y-%m-%d")
+    from zoneinfo import ZoneInfo
+    today = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
     results = []
 
     if output_mode in ("markdown", "both"):
@@ -208,16 +211,60 @@ def run(config_path: str = "sources.yaml", output_dir: str = "summaries", api_ke
             print(f"邮件已发送至 {email_to}")
             results.append(f"Email: {email_to}")
         except Exception as e:
-            print(f"[警告] 邮件发送失败: {e}")
+            raise RuntimeError("邮件发送失败，保留原去重状态") from e
 
     return "\n".join(results)
 
 
-if __name__ == "__main__":
-    api_key = os.environ.get("KIMI_API_KEY")
-    if not api_key:
-        print("请设置环境变量 KIMI_API_KEY")
-        exit(1)
+def run(config_path="sources.yaml", output_dir="summaries", api_key=None):
+    # Fetchers update a temporary state; publish it only after successful email.
+    import tempfile
+    from src import state
+    original = state._STATE_FILE
+    for name in ("EMAIL_USER", "EMAIL_PASSWORD", "EMAIL_TO"):
+        if not os.environ.get(name):
+            raise ValueError("缺少配置：" + name)
+    with tempfile.TemporaryDirectory() as folder:
+        staged = Path(folder) / "state.json"
+        if original.exists():
+            staged.write_bytes(original.read_bytes())
+        state._STATE_FILE = staged
+        try:
+            result = _run(config_path, output_dir, api_key)
+            if staged.exists():
+                original.parent.mkdir(parents=True, exist_ok=True)
+                original.write_bytes(staged.read_bytes())
+            return result
+        finally:
+            state._STATE_FILE = original
 
-    out = run(api_key=api_key)
-    print(f"完成！\n{out}")
+
+def check_sources(config_path="sources.yaml"):
+    import tempfile
+    from src import state
+    original = state._STATE_FILE
+    config = load_config(config_path)
+    with tempfile.TemporaryDirectory() as folder:
+        state._STATE_FILE = Path(folder) / "state.json"
+        try:
+            items = fetch_all(config.get("sources", []), config.get("max_entries", 2), config.get("max_age_days", 3))
+            usable = 0
+            for item in items:
+                ok = bool(item.link and len(item.content or "") >= 100 and not item.title.startswith("["))
+                usable += int(ok)
+                print(item.source_name, "可用" if ok else "无有效材料", len(item.content or ""))
+            if not usable:
+                raise RuntimeError("全部来源均无有效材料")
+        finally:
+            state._STATE_FILE = original
+
+
+if __name__ == "__main__":
+    import sys
+    if "--check" in sys.argv:
+        check_sources()
+    else:
+        api_key = os.environ.get("KIMI_API_KEY")
+        if not api_key:
+            raise ValueError("请设置 KIMI_API_KEY")
+        print(run(api_key=api_key))
