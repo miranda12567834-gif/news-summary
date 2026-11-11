@@ -20,7 +20,7 @@ def fetch_search(config, check_only=False):
         payload = {"query": config["query"], "include_domains": domains,
                    "time_range": config.get("time_range", "week"),
                    "search_depth": "basic", "max_results": 3,
-                   "include_answer": False, "include_raw_content": False}
+                   "include_answer": False, "include_raw_content": "text"}
         request = Request("https://api.tavily.com/search",
             data=json.dumps(payload).encode(),
             headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"})
@@ -28,6 +28,7 @@ def fetch_search(config, check_only=False):
             results = json.load(response).get("results", [])
     except Exception:
         return [RawItem(source_name=name, source_type="rss", title="[搜索失败]", content="搜索服务请求失败；详查服务账户及额度，不代表没有更新", link=None)]
+    print(name, "搜索返回", len(results), "条结果")
     items = []
     st = state.load()
     for result in results:
@@ -38,6 +39,10 @@ def fetch_search(config, check_only=False):
         if state.is_seen(st, "seenArticles", url):
             continue
         body = _fetch_fulltext(url, max_chars=16000)
+        if not body or len(body) < 1000:
+            raw = result.get("raw_content")
+            if isinstance(raw, str) and len(raw.strip()) >= 1000:
+                body = raw[:16000] + "\n[搜索服务提取正文；可能不完整，不能视作独立核验]"
         if not body or len(body) < 1000:
             print(name, "原文不足，剔除", host)
             continue
@@ -50,6 +55,7 @@ def fetch_search(config, check_only=False):
         state.mark_seen(st, "seenArticles", url)
         if len(items) >= 2:
             break
+    print(name, "取得正文", len(items), "篇")
     state.save(st)
     if not items:
         return [RawItem(source_name=name, source_type="rss", title="[搜索无可用正文]", content="本次搜索没有取得合格正文，不代表该领域没有重要内容", link=None)]
