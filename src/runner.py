@@ -29,7 +29,7 @@ def load_sources(config_path: str = "sources.yaml") -> list[dict]:
     return load_config(config_path).get("sources", [])
 
 
-def fetch_all(sources: list[dict], global_max_entries: int = 3, global_max_age_days: int = 30) -> list[RawItem]:
+def fetch_all(sources: list[dict], global_max_entries: int = 3, global_max_age_days: int = 30, check_only: bool = False) -> list[RawItem]:
     """根据配置抓取所有源
 
     global_max_entries: 全局每源最多条数上限（sources.yaml 里的单独设置不超过此值）
@@ -41,7 +41,11 @@ def fetch_all(sources: list[dict], global_max_entries: int = 3, global_max_age_d
         name = src.get("name", "未命名")
         before = len(items)
 
-        if stype == "rss":
+        if stype == "search":
+            from src.fetchers.search import fetch_search
+            items.extend(fetch_search(src, check_only=check_only))
+
+        elif stype == "rss":
             url = src.get("url")
             if not url:
                 items.append(RawItem(source_name=name, source_type="rss", title="[配置错误]", content="缺少 url", link=None))
@@ -250,7 +254,7 @@ def check_sources(config_path="sources.yaml"):
     with tempfile.TemporaryDirectory() as folder:
         state._STATE_FILE = Path(folder) / "state.json"
         try:
-            items = fetch_all(config.get("sources", []), config.get("max_entries", 2), config.get("max_age_days", 3))
+            items = fetch_all(config.get("sources", []), config.get("max_entries", 2), config.get("max_age_days", 3), check_only=True)
             usable = 0
             for item in items:
                 ok = bool(item.link and len(item.content or "") >= 100 and not item.title.startswith("["))

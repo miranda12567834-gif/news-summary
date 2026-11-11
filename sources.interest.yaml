@@ -18,3 +18,23 @@ sources:
   - {type: rss, name: 'Nature Sustainability可持续发展论文', url: 'https://www.nature.com/natsustain.rss', fetch_fulltext: true, fulltext_chars: 16000}
   - {type: rss, name: 'Nature Medicine医学论文', url: 'https://www.nature.com/nm.rss', fetch_fulltext: true, fulltext_chars: 16000}
   - {type: rss, name: 'Scientific Reports跨领域论文', url: 'https://www.nature.com/srep.rss', fetch_fulltext: true, fulltext_chars: 16000}
+  - type: search
+    name: 'Reuters与AP主动检索'
+    query: 'major developments gender culture technology China economy'
+    domains: ["reuters.com","apnews.com"]
+    time_range: day
+  - type: search
+    name: '政府与国际组织主动检索'
+    query: 'gender youth employment economy policy new report'
+    domains: ["gov.cn","stats.gov.cn","unwomen.org","unesco.org","ilo.org"]
+    time_range: week
+  - type: search
+    name: '心理社会论文主动检索'
+    query: 'new research psychology inequality social behavior methods results'
+    domains: ["journals.sagepub.com","nature.com"]
+    time_range: month
+  - type: search
+    name: 'Science Advances与QJE论文主动检索'
+    query: 'new research inequality economic behavior artificial intelligence'
+    domains: ["science.org","academic.oup.com"]
+    time_range: month
