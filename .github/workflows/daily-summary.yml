@@ -42,7 +42,7 @@ jobs:
       - name: Audit candidate evidence
         if: github.event_name == 'push' || inputs.mode == 'audit'
         env:
-          LIVE_SEARCH: ${{ inputs.mode == 'audit' && '1' || '0' }}
+          LIVE_SEARCH: ${{ (inputs.mode == 'audit' || github.event.head_commit.message == 'Audit configured search providers once') && '1' || '0' }}
         run: python -m src.audit
       - name: Check sources without AI or email
         if: github.event_name == 'workflow_dispatch' && inputs.mode == 'check'

@@ -12,15 +12,15 @@ API = "https://www.ebi.ac.uk/europepmc/webservices/rest"
 
 
 def evidence(xml):
-    body = ET.fromstring(xml).find(".//article/body")
-    if body is None:
-        body = ET.fromstring(xml).find("./body")
+    root = ET.fromstring(xml)
+    body = root.find(".//body")
     if body is None:
         return ""
     sections = []
-    for sec in body.findall("./sec"):
-        heading = " ".join(sec.findtext("title", "").split())
-        paragraphs = [" ".join("".join(p.itertext()).split()) for p in sec.iter("p")]
+    for sec in body.iter("sec"):
+        title = sec.find("title")
+        heading = " ".join("".join(title.itertext()).split()) if title is not None else ""
+        paragraphs = [" ".join("".join(p.itertext()).split()) for p in sec.findall("p")]
         if heading and paragraphs:
             sections.append((heading, " ".join(paragraphs)))
     headings = " ".join(h.lower() for h, _ in sections)
@@ -43,12 +43,16 @@ def fetch_papers(config):
         for record in records:
             doi, pmc = record.get("doi"), record.get("pmcid")
             if not doi or not pmc or not record.get("firstPublicationDate"):
+                print(config["name"], "缺少 DOI、PMC 全文编号或日期", doi)
                 continue
             try:
                 with urlopen(f"{API}/{pmc}/fullTextXML", timeout=20) as response:
                     content = evidence(response.read(8000000))
-            except (OSError, ET.ParseError):
+            except (OSError, ET.ParseError) as exc:
+                print(config["name"], doi, "全文读取失败", type(exc).__name__)
                 continue
+            if not content:
+                print(config["name"], doi, "全文缺可解析的方法或结果分节")
             if content:
                 items.append(RawItem(config["name"], "paper", record["title"],
                                      f"开放全文分节摘录（{pmc}）\n" + content,
@@ -79,12 +83,14 @@ def fetch_journal(config):
         for record in records:
             parts = record.get("published", {}).get("date-parts", [[]])[0]
             if len(parts) != 3 or not record.get("title"):
+                print(config["name"], "缺少完整日期或标题")
                 continue
             link = "https://doi.org/" + record["DOI"]
             try:
                 with urlopen(Request(link, headers={"User-Agent": "NewsSummary/1.0"}), timeout=15) as response:
                     page = html.fromstring(response.read(4000000))
-            except (OSError, ValueError, ParserError):
+            except (OSError, ValueError, ParserError) as exc:
+                print(config["name"], link, "出版页读取失败", getattr(exc, "code", type(exc).__name__))
                 continue
             sections = []
             for section in page.xpath('//section[h2] | //div[h2 and p]'):
@@ -94,6 +100,7 @@ def fetch_journal(config):
                     sections.append((section.find("h2").text_content().strip(), body))
             headings = " ".join(h.lower() for h, _ in sections)
             if not any(k in headings for k in ("data", "method", "empirical", "design")):
+                print(config["name"], link, "出版页缺方法分节")
                 continue
             if not any(k in headings for k in ("results", "findings", "estimates")):
                 continue
