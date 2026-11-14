@@ -39,6 +39,7 @@ def fetch_papers(config):
     try:
         with urlopen(f"{API}/search?{params}", timeout=15) as response:
             records = json.load(response)["resultList"]["result"]
+        print(config["name"], "索引返回", len(records), "条")
         for record in records:
             doi, pmc = record.get("doi"), record.get("pmcid")
             if not doi or not pmc or not record.get("firstPublicationDate"):
@@ -56,6 +57,7 @@ def fetch_papers(config):
                 break
     except (OSError, ValueError, KeyError) as exc:
         logging.warning("%s 检索失败 %s", config["name"], type(exc).__name__)
+    print(config["name"], "取得方法和结果摘录", len(items), "篇")
     return items
 
 
@@ -73,6 +75,7 @@ def fetch_journal(config):
     try:
         with urlopen(url, timeout=15) as response:
             records = json.load(response)["message"]["items"]
+        print(config["name"], "索引返回", len(records), "条")
         for record in records:
             parts = record.get("published", {}).get("date-parts", [[]])[0]
             if len(parts) != 3 or not record.get("title"):
@@ -101,4 +104,5 @@ def fetch_journal(config):
                 break
     except (OSError, ValueError, KeyError) as exc:
         logging.warning("%s 检索失败 %s", config["name"], type(exc).__name__)
+    print(config["name"], "取得方法和结果摘录", len(items), "篇")
     return items

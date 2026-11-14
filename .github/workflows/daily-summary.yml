@@ -1,13 +1,16 @@
 name: Daily Summary
 on:
+  push:
+    branches: [main]
+    paths: ['src/audit.py', 'src/editorial.py', 'src/fetchers/**', 'sources.interest.yaml']
   schedule:
     - cron: '0 22 * * *' # 06:00 Asia/Shanghai
   workflow_dispatch:
     inputs:
       mode:
-        description: 'check免费检查；preview付费生成预览；send生成并发邮件'
+        description: 'audit实际检索（使用搜索额度、零模型调用）；check免费检查；preview付费生成预览；send生成并发邮件'
         type: choice
-        options: [check, preview, send]
+        options: [check, audit, preview, send]
         default: check
 permissions:
   contents: read
@@ -16,7 +19,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   summarize:
-    if: github.event_name == 'workflow_dispatch' || (vars.DIGEST_ENABLED == 'true' && vars.QUALITY_APPROVED == 'true')
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (vars.DIGEST_ENABLED == 'true' && vars.QUALITY_APPROVED == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -36,6 +39,11 @@ jobs:
           key: news-summary-state-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: news-summary-state-
       - run: cp sources.interest.yaml sources.yaml
+      - name: Audit candidate evidence
+        if: github.event_name == 'push' || inputs.mode == 'audit'
+        env:
+          LIVE_SEARCH: ${{ inputs.mode == 'audit' && '1' || '0' }}
+        run: python -m src.audit
       - name: Check sources without AI or email
         if: github.event_name == 'workflow_dispatch' && inputs.mode == 'check'
         run: python -m src.runner --check
