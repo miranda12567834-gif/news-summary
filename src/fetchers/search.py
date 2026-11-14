@@ -21,6 +21,8 @@ def fetch_search(config, check_only=False):
                    "time_range": config.get("time_range", "week"),
                    "search_depth": "basic", "max_results": 3,
                    "include_answer": False, "include_raw_content": "text"}
+        if config.get("topic"):
+            payload["topic"] = config["topic"]
         request = Request("https://api.tavily.com/search",
             data=json.dumps(payload).encode(),
             headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"})
@@ -60,3 +62,4 @@ def fetch_search(config, check_only=False):
     if not items:
         return [RawItem(source_name=name, source_type="rss", title="[搜索无可用正文]", content="本次搜索没有取得合格正文，不代表该领域没有重要内容", link=None)]
     return items
+

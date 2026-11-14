@@ -1,4 +1,5 @@
 language: zh
+interest_brief: true
 max_entries: 2
 max_age_days: 7
 sources:
@@ -13,28 +14,24 @@ sources:
   - {type: rss, name: 'UN Women女性与性别', url: 'https://www.unwomen.org/en/rss.xml', fetch_fulltext: true, fulltext_chars: 16000}
   - {type: rss, name: 'OpenAI官方', url: 'https://openai.com/news/rss.xml', fetch_fulltext: true, fulltext_chars: 16000}
   - {type: rss, name: '英国政府政策公告', url: 'https://www.gov.uk/search/news-and-communications.atom', fetch_fulltext: true, fulltext_chars: 16000}
-  - {type: rss, name: 'Communications Psychology心理学论文', url: 'https://www.nature.com/commspsychol.rss', fetch_fulltext: true, fulltext_chars: 16000}
-  - {type: rss, name: 'Nature Human Behaviour人类行为论文', url: 'https://www.nature.com/nathumbehav.rss', fetch_fulltext: true, fulltext_chars: 16000}
-  - {type: rss, name: 'Nature Sustainability可持续发展论文', url: 'https://www.nature.com/natsustain.rss', fetch_fulltext: true, fulltext_chars: 16000}
-  - {type: rss, name: 'Nature Medicine医学论文', url: 'https://www.nature.com/nm.rss', fetch_fulltext: true, fulltext_chars: 16000}
-  - {type: rss, name: 'Scientific Reports跨领域论文', url: 'https://www.nature.com/srep.rss', fetch_fulltext: true, fulltext_chars: 16000}
   - type: search
-    name: 'Reuters与AP主动检索'
-    query: 'major developments gender culture technology China economy'
-    domains: ["reuters.com","apnews.com"]
-    time_range: day
+    name: Reuters中国经济与社会
+    topic: news
+    query: 'China economy and society'
+    domains: ["reuters.com"]
+    time_range: week
   - type: search
     name: '政府与国际组织主动检索'
     query: 'gender youth employment economy policy new report'
     domains: ["gov.cn","stats.gov.cn","unwomen.org","unesco.org","ilo.org"]
     time_range: week
+  - {type: papers, name: Science Advances, issn: '2375-2548'}
+  - {type: papers, name: Psychological Science, issn: '1467-9280'}
+  - {type: papers, name: Communications Psychology, issn: '2731-9121'}
+  - {type: papers, provider: crossref, name: Quarterly Journal of Economics, issn: '0033-5533'}
   - type: search
-    name: '心理社会论文主动检索'
-    query: 'new research psychology inequality social behavior methods results'
-    domains: ["journals.sagepub.com","nature.com"]
-    time_range: month
-  - type: search
-    name: 'Science Advances与QJE论文主动检索'
-    query: 'new research inequality economic behavior artificial intelligence'
-    domains: ["science.org","academic.oup.com"]
-    time_range: month
+    name: AP文化与社会
+    topic: news
+    query: 'arts entertainment and culture'
+    domains: ["apnews.com"]
+    time_range: week

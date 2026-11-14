@@ -41,7 +41,11 @@ def fetch_all(sources: list[dict], global_max_entries: int = 3, global_max_age_d
         name = src.get("name", "未命名")
         before = len(items)
 
-        if stype == "search":
+        if stype == "papers":
+            from src.fetchers.papers import fetch_journal, fetch_papers
+            items.extend(fetch_journal(src) if src.get("provider") == "crossref" else fetch_papers(src))
+
+        elif stype == "search":
             from src.fetchers.search import fetch_search
             items.extend(fetch_search(src, check_only=check_only))
 
@@ -143,6 +147,8 @@ def _run(config_path: str = "sources.yaml", output_dir: str = "summaries", api_k
     global_max_entries = config.get("max_entries", 3)
     global_max_age_days = config.get("max_age_days", 30)
 
+    from src import state
+    delivered = state.load()
     items = fetch_all(sources, global_max_entries=global_max_entries, global_max_age_days=global_max_age_days)
     print(f"共抓取 {len(items)} 条内容")
 
@@ -157,6 +163,11 @@ def _run(config_path: str = "sources.yaml", output_dir: str = "summaries", api_k
     # 把"暂无更新"的条目排到末尾，使输出中有内容的来源优先显示
     valid_items.sort(key=lambda i: i.title == "暂无更新")
 
+    if config.get("interest_brief"):
+        from src.editorial import shortlist
+        valid_items = shortlist([i for i in valid_items if not state.is_seen(delivered, "seenArticles", i.link)], sources)
+        print("入选写作候选", len(valid_items), "篇，正文字符", sum(len(i.content) for i in valid_items))
+
     if not any(i.link and len(i.content or "") >= 100 for i in valid_items):
         raise RuntimeError("没有足够的有效材料，停止调用模型")
     summary_text = summarize(valid_items, api_key=api_key, language=language)
@@ -164,6 +175,10 @@ def _run(config_path: str = "sources.yaml", output_dir: str = "summaries", api_k
     output_mode = os.environ.get("OUTPUT_MODE", "markdown")  # notion | markdown | both
     from zoneinfo import ZoneInfo
     today = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
+    if config.get("interest_brief"):
+        import re
+        summary_text = re.sub(r"^#\s*每日兴趣简报[^\n]*\n?", "", summary_text.strip())
+        summary_text = f"# 每日兴趣简报｜{today}\n\n" + summary_text.lstrip()
     results = []
 
     if output_mode in ("markdown", "both"):
@@ -172,7 +187,8 @@ def _run(config_path: str = "sources.yaml", output_dir: str = "summaries", api_k
         title_map = {"zh": "每日摘要", "en": "Daily Summary", "bilingual": "每日摘要 / Daily Summary"}
         title = title_map.get(language, "每日摘要")
         with open(out_path, "w", encoding="utf-8") as f:
-            f.write(f"# {title} {today}\n\n")
+            if not config.get("interest_brief"):
+                f.write(f"# {title} {today}\n\n")
             f.write(summary_text)
         results.append(f"Markdown: {out_path}")
 
@@ -215,6 +231,11 @@ def _run(config_path: str = "sources.yaml", output_dir: str = "summaries", api_k
             from src.email_sender import send_email
             send_email(summary_text, date=today, smtp_user=email_user,
                        smtp_password=email_password, to_address=email_to, language=language)
+            if config.get("interest_brief"):
+                cited = set(re.findall(r"\[[^\]]+\]\((https?://[^)]+)\)", summary_text))
+                for link in cited:
+                    state.mark_seen(delivered, "seenArticles", link)
+                state.save(delivered)
             print(f"邮件已发送至 {email_to}")
             results.append(f"Email: {email_to}")
         except Exception as e:
@@ -273,6 +294,8 @@ def preview_digest(config_path="sources.yaml", output_dir="summaries", api_key=N
     original = state._STATE_FILE
     with tempfile.TemporaryDirectory() as folder:
         state._STATE_FILE = Path(folder) / "state.json"
+        if original.exists():
+            state._STATE_FILE.write_bytes(original.read_bytes())
         try:
             return _run(config_path, output_dir, api_key, preview=True)
         finally:
