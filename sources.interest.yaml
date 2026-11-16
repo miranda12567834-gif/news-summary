@@ -3,6 +3,16 @@ interest_brief: true
 max_entries: 2
 max_age_days: 7
 sources:
+  - type: search
+    name: 投行与资管资本流向
+    query: 'fund net flows sector allocation capital deployed investment deals latest data'
+    domains: ["goldmansachs.com","jpmorgan.com","morganstanley.com","blackrock.com"]
+    time_range: week
+  - type: search
+    name: 咨询机构投资线索
+    query: 'private equity deal value capital expenditure sector investment survey new report'
+    domains: ["bain.com","mckinsey.com","bcg.com"]
+    time_range: week
   - {type: rss, name: BBC国际, url: 'https://feeds.bbci.co.uk/news/world/rss.xml', fetch_fulltext: true, fulltext_chars: 8000}
   - {type: rss, name: 联合国新闻, url: 'https://news.un.org/feed/subscribe/en/news/all/rss.xml', fetch_fulltext: true, fulltext_chars: 8000}
   - {type: rss, name: 女性与社会, url: 'https://www.theguardian.com/lifeandstyle/women/rss', fetch_fulltext: true, fulltext_chars: 8000}
