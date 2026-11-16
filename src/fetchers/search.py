@@ -8,6 +8,35 @@ from .base import RawItem
 from .rss import _fetch_fulltext
 from src import state
 
+def original_date(url):
+    from lxml import html
+    from lxml.etree import ParserError
+    from src.editorial import publication_time
+    try:
+        with urlopen(Request(url, headers={"User-Agent": "NewsSummary/1.0"}), timeout=10) as response:
+            page = html.fromstring(response.read(2000000))
+        for meta in page.xpath("//meta[@content]"):
+            key = (meta.get("property") or meta.get("name") or meta.get("itemprop") or "").lower()
+            if key in {"article:published_time", "datepublished", "dcterms.issued", "pubdate", "firstpublishedtime"}:
+                value = meta.get("content", "").strip()
+                if publication_time(value):
+                    return value
+        for script in page.xpath('//script[@type="application/ld+json"]/text()'):
+            try:
+                data = json.loads(script)
+            except ValueError:
+                continue
+            nodes = data if isinstance(data, list) else [data]
+            for node in nodes:
+                if isinstance(node, dict):
+                    nodes.extend(node.get("@graph") or [])
+                    if node.get("@type") in ("Article", "NewsArticle", "Report", "WebPage") and publication_time(node.get("datePublished")):
+                        return node["datePublished"]
+    except (OSError, ValueError, ParserError):
+        pass
+    return ""
+
+
 def fetch_search(config, check_only=False):
     name = config["name"]
     key = os.environ.get("TAVILY_API_KEY")
@@ -49,10 +78,15 @@ def fetch_search(config, check_only=False):
             print(name, "原文不足，剔除", host)
             continue
         # Search dates are not independently verified publication dates.
-        published = result.get("published_date", "")
+        page_date = original_date(url)
+        published = page_date or result.get("published_date", "")
+        if not published:
+            print(name, "缺发布日期", host)
+            continue
+        date_source = "日期来自原网页发布字段" if page_date else "日期来自搜索索引，未经原页确认"
         items.append(RawItem(source_name=name, source_type="rss",
             title=result.get("title", "未命名"),
-            content="[主动搜索所得网页正文；日期未经独立核实；可能截断]\n" + body,
+            content=f"[主动搜索所得网页正文；{date_source}；可能截断]\n" + body,
             link=url, published=published))
         state.mark_seen(st, "seenArticles", url)
         if len(items) >= 2:
