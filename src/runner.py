@@ -177,7 +177,7 @@ def _run(config_path: str = "sources.yaml", output_dir: str = "summaries", api_k
     today = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
     if config.get("interest_brief"):
         import re
-        summary_text = re.sub(r"^#\s*每日兴趣简报[^\n]*\n?", "", summary_text.strip())
+        summary_text = re.sub(r"^(?:(?:#+[ \\t]*)?每日兴趣简报[｜| ]+\\d{4}-\\d{2}-\\d{2}[^\\S\\n]*\\n+)+", "", summary_text.strip())
         summary_text = f"# 每日兴趣简报｜{today}\n\n" + summary_text.lstrip()
     results = []
 

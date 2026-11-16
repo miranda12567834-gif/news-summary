@@ -30,7 +30,15 @@ def evidence(xml):
         return ""
     if not any(k in headings for k in ("result", "finding")):
         return ""
-    return "\n".join(h + "\n" + t[:2200] for h, t in sections[:12])
+    excerpts = []
+    for keywords, limit in [(("result", "finding"), 3), (("method", "materials", "experimental"), 2),
+                            (("discussion", "limitation", "conclusion"), 2), (("introduction",), 1)]:
+        matches = [(h, t) for h, t in sections if any(k in h.lower() for k in keywords)]
+        excerpts.extend(h + "\n" + t[:2200] for h, t in matches[:limit])
+    abstract = root.find(".//article-meta/abstract")
+    if abstract is not None:
+        excerpts.append("作者摘要（对照结果）\n" + " ".join(abstract.itertext())[:2200])
+    return "\n".join(excerpts)
 
 
 def fetch_papers(config):
