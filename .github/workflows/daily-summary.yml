@@ -2,7 +2,7 @@ name: Daily Summary
 on:
   push:
     branches: [main]
-    paths: ['src/audit.py', 'src/editorial.py', 'src/fetchers/**', 'sources.interest.yaml']
+    paths: ['.github/workflows/daily-summary.yml', 'src/audit.py', 'src/editorial.py', 'src/fetchers/**', 'sources.interest.yaml']
   schedule:
     - cron: '0 22 * * *' # 06:00 Asia/Shanghai
   workflow_dispatch:
@@ -40,7 +40,7 @@ jobs:
           restore-keys: news-summary-state-
       - run: cp sources.interest.yaml sources.yaml
       - name: Audit candidate evidence
-        if: github.event_name == 'push' || inputs.mode == 'audit'
+        if: (github.event_name == 'push' && github.event.head_commit.message != 'Review one digest preview') || inputs.mode == 'audit'
         env:
           LIVE_SEARCH: ${{ (inputs.mode == 'audit' || github.event.head_commit.message == 'Audit configured search providers once') && '1' || '0' }}
         run: python -m src.audit
@@ -48,17 +48,19 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.mode == 'check'
         run: python -m src.runner --check
       - name: Generate preview without delivery
-        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'preview'
+        if: inputs.mode == 'preview' || (github.event_name == 'push' && github.event.head_commit.message == 'Review one digest preview')
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           DEEPSEEK_MODEL: ${{ vars.DEEPSEEK_MODEL || 'deepseek-flash' }}
           OUTPUT_MODE: markdown
         run: |
           python -m src.runner --preview
+          cat "summaries/$(date +%F).md" >> "$GITHUB_STEP_SUMMARY"
+          cat "summaries/$(date +%F).md"
           mkdir -p digest-preview
           cp "summaries/$(date +%F).md" digest-preview/
       - uses: actions/upload-artifact@v4
-        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'preview'
+        if: inputs.mode == 'preview' || (github.event_name == 'push' && github.event.head_commit.message == 'Review one digest preview')
         with:
           name: digest-preview
           path: digest-preview/*.md
